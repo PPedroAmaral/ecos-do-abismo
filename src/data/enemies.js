@@ -1,3 +1,4 @@
+// src/data/enemies.js
 export const enemies = {
     // --- ÁREA 1: ESGOTOS ---
     rato_mutante: {
@@ -5,20 +6,22 @@ export const enemies = {
         name: 'Rato Mutante',
         area: 'esgotos',
         maxHp: 15,
-        ac: 12, 
+        ac: 12,
         damage: '1d4+1',
         xpReward: 10,
-        isBoss: false
+        isBoss: false,
+        drops: ['adaga_ferrugem', 'trapos'] 
     },
     gosma_toxica: {
         id: 'gosma_toxica',
         name: 'Gosma Tóxica',
         area: 'esgotos',
         maxHp: 22,
-        ac: 10, 
+        ac: 10,
         damage: '1d6',
         xpReward: 15,
-        isBoss: false
+        isBoss: false,
+        drops: ['sal_refinado', 'pocao_vida'] 
     },
     vigilante_lodo: {
         id: 'vigilante_lodo',
@@ -39,32 +42,10 @@ export const enemies = {
         area: 'biblioteca',
         maxHp: 25,
         ac: 14,
-        damage: '1d4+3', // Dano focado na mente
+        damage: '1d4+3',
         xpReward: 25,
-        isBoss: false
+        isBoss: false,
+        drops: ['pergaminho_perdido', 'cajado_esmeralda'] 
     },
-
-    // --- ÁREA 3: FORJA ---
-    elemental_fogo: {
-        id: 'elemental_fogo',
-        name: 'Elemental de Fogo',
-        area: 'forja',
-        maxHp: 40,
-        ac: 15,
-        damage: '2d6',
-        xpReward: 40,
-        isBoss: false
-    },
-
-    // --- ÁREA 4: TRONO ---
-    rei_decaido: {
-        id: 'rei_decaido',
-        name: 'O Rei Decaído',
-        area: 'trono',
-        maxHp: 150,
-        ac: 18,
-        damage: '2d8+4',
-        xpReward: 500,
-        isBoss: true
-    }
+    
 };

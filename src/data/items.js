@@ -73,5 +73,20 @@ export const items = {
         name: 'Sal Refinado',
         type: 'consumivel_combate',
         description: 'Impede a regeneração de monstros de lodo.'
-    }
+    },
+    pergaminho_perdido: {
+        id: 'pergaminho_perdido',
+        name: 'Pergaminho Perdido',
+        type: 'quest',
+        description: 'Um rolo de pergaminho que emana uma luz suave. O Ancião Kaelen procura por isto.'
+    },
+    cajado_esmeralda: {
+        id: 'cajado_esmeralda',
+        name: 'Cajado de Esmeralda',
+        type: 'arma_magica',
+        damage: '2d4',
+        bonusAttr: 'inteligencia',
+        requirements: { inteligencia: 12 },
+        description: 'Um cajado polido que pulsa com energia arcana.'
+    },
 };

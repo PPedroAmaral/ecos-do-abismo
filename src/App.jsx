@@ -11,7 +11,7 @@ import { useAudio } from './hooks/useAudio';
 
 
 function App() {
-  const { player, setPlayer, maxHp, maxMp, armorClass, gameState, setGameState, addLog, gainXp, xpToNextLevel, increaseAttribute, addToInventory, equipItem, removeFromInventory, MAX_INVENTORY_SLOTS, inventory, checkRequirements, quests, setQuests } = useGame();
+  const { player, setPlayer, maxHp, maxMp, armorClass, gameState, setGameState, addLog, gainXp, xpToNextLevel, increaseAttribute, addToInventory, equipItem, removeFromInventory, MAX_INVENTORY_SLOTS, inventory, checkRequirements, quests, setQuests, consumeItem } = useGame();
 
   const { playBGM, playSFX } = useAudio();
   useEffect(() => {
@@ -82,7 +82,7 @@ function App() {
     const attrKey = weapon ? weapon.bonusAttr : 'forca'
     const attrValue = player.attributes[attrKey]
 
-    const attrBonus = Math.floor((attrValue - 10) / 2)
+    const attrBonus = Math.floor((attrValue - 8) / 2)
 
     const d20 = rollDice(20)
     const toHit = d20 + attrBonus + player.level
@@ -102,10 +102,44 @@ function App() {
         addLog(`Derrotou o ${enemy.name}! Ganhou ${enemy.xpReward} XP.`)
         gainXp(enemy.xpReward);
 
-        if(rollDice(100) <= 40) {
-          const itemList = Object.values(items).filter(i => i.type !== 'quest')
-          const randomItem = itemList[Math.floor(Math.random() * itemList.length)];
-          addToInventory(randomItem);
+        if (enemy.isBoss) {
+          addLog(`O Guardião caiu! O portão para a próxima área está aberto!`);
+          
+          if (enemy.id === 'vigilante_lodo') {
+            // Dropa o item da quest da Dama obrigatoriamente
+            addToInventory(items.pingente_elara || { id: 'pingente_elara', name: 'Pingente de Elara', type: 'quest' });
+            
+            // Muda a área para a Biblioteca
+            setGameState(prev => ({ 
+              ...prev, 
+              currentEvent: null, 
+              activeEnemy: null,
+              currentArea: 'biblioteca',
+              logs: [...prev.logs, "Bem-vindo à Biblioteca Esquecida. O ar aqui cheira a pergaminho velho e magia instável."]
+            }));
+          }
+          return;
+        }
+
+        if (enemy.drops && enemy.drops.length > 0) {
+          // 50% de probabilidade de o monstro deixar cair algo da SUA lista
+          if (rollDice(100) <= 50) {
+            const randomDropId = enemy.drops[Math.floor(Math.random() * enemy.drops.length)];
+            const droppedItem = items[randomDropId];
+            
+            if (droppedItem) {
+              const success = addToInventory(droppedItem);
+              if (success) {
+                // Removemos o log antigo do addToInventory e colocamos um mais emocionante aqui
+                addLog(`🎁 O ${enemy.name} deixou cair: ${droppedItem.name}!`);
+              }
+            }
+          }
+        } else {
+          // Se o monstro não tiver lista específica, 20% de chance de cair uma poção de vida genérica
+          if (rollDice(100) <= 20) {
+              addToInventory(items.pocao_vida);
+          }
         }
 
         setGameState(prev => ({...prev, currentEvent: null, activeEnemy:null}))
@@ -121,17 +155,34 @@ function App() {
     }
 
     setTimeout(() => {
+      // --- MECÂNICA DO CHEFE: REGENERAÇÃO ---
+      if (enemy.id === 'vigilante_lodo' && enemy.currentHp > 0) {
+        const healAmount = 5;
+        setGameState(prev => {
+          if (!prev.activeEnemy) return prev;
+          return {
+            ...prev,
+            activeEnemy: { 
+              ...prev.activeEnemy, 
+              currentHp: Math.min(prev.activeEnemy.maxHp, prev.activeEnemy.currentHp + healAmount) 
+            }
+          };
+        });
+        addLog(`O lodo junta-se novamente... O Vigilante recuperou ${healAmount} HP!`);
+      }
+
+      // O Inimigo ataca
       const enemyD20 = rollDice(20);
-      const enemyToHit = enemyD20 + 4; 
+      const enemyToHit = enemyD20 + 2; 
       
       if (enemyToHit >= armorClass) {
-        const enemyDmg = rollDamage(gameState.activeEnemy.damage);
-        addLog(`O ${enemy.name} atacou! Você sofreu ${enemyDmg} de dano.`);
+        const enemyDmg = rollDamage(enemy.damage);
+        addLog(`O ${enemy.name} atacou! Sofreu ${enemyDmg} de dano.`);
         setPlayer(prev => ({ ...prev, currentHp: prev.currentHp - enemyDmg }));
       } else {
         addLog(`Esquivou-se do ataque do ${enemy.name}!`);
       }
-    }, 500)
+    }, 300);
   }
 
   const handleCastSpell = (spellId) => {
@@ -143,11 +194,11 @@ function App() {
     }
 
     setPlayer(prev => ({ ...prev, currentMp: prev.currentMp - spell.mpCost }));
-    playSFX('magic');
 
-    const intBonus = Math.floor((player.attributes.inteligencia - 10) / 2)
+    const intBonus = Math.floor((player.attributes.inteligencia - 8) / 2)
 
     if(spell.type === 'cura') {
+      playSFX(spellId);
       const healAmount = rollDamage(spell.heal) + intBonus
       setPlayer(prev => ({
         ...prev,
@@ -164,6 +215,8 @@ function App() {
         return
       }
 
+      playSFX(spellId)
+
       const enemy = gameState.activeEnemy;
       const spellDmg = rollDamage(spell.damage) + intBonus;
       
@@ -174,17 +227,47 @@ function App() {
       if (newEnemyHp <= 0) {
         addLog(`💀 Derrotou o ${enemy.name}! Ganhou ${enemy.xpReward} XP.`);
         gainXp(enemy.xpReward);
+
+        if (enemy.isBoss) {
+          addLog(`O Guardião caiu! O portão para a próxima área está aberto!`);
+          
+          if (enemy.id === 'vigilante_lodo') {
+            // Dropa o item da quest da Dama obrigatoriamente
+            addToInventory(items.pingente_elara || { id: 'pingente_elara', name: 'Pingente de Elara', type: 'quest' });
+            
+            // Muda a área para a Biblioteca
+            setGameState(prev => ({ 
+              ...prev, 
+              currentEvent: null, 
+              activeEnemy: null,
+              currentArea: 'biblioteca',
+              logs: [...prev.logs, "Bem-vindo à Biblioteca Esquecida. O ar aqui cheira a pergaminho velho e magia instável."]
+            }));
+          }
+          return;
+        }
         
         // Loot
-        if (rollDice(100) <= 40) {
-          const itemList = Object.values(items).filter(i => i.type !== 'quest');
-          // eslint-disable-next-line react-hooks/purity
-          const randomItem = itemList[Math.floor(Math.random() * itemList.length)];
-          addLog(`O inimigo deixou cair: ${randomItem.name}!`);
-          addToInventory(prev => {
-            if (prev.length < MAX_INVENTORY_SLOTS) return [...prev, randomItem];
-            return prev;
-          });
+        if (enemy.drops && enemy.drops.length > 0) {
+          // 50% de probabilidade de o monstro deixar cair algo da SUA lista
+          if (rollDice(100) <= 50) {
+            // eslint-disable-next-line react-hooks/purity
+            const randomDropId = enemy.drops[Math.floor(Math.random() * enemy.drops.length)];
+            const droppedItem = items[randomDropId];
+            
+            if (droppedItem) {
+              const success = addToInventory(droppedItem);
+              if (success) {
+                // Removemos o log antigo do addToInventory e colocamos um mais emocionante aqui
+                addLog(`🎁 O ${enemy.name} deixou cair: ${droppedItem.name}!`);
+              }
+            }
+          }
+        } else {
+          // Se o monstro não tiver lista específica, 20% de chance de cair uma poção de vida genérica
+          if (rollDice(100) <= 20) {
+              addToInventory(items.pocao_vida);
+          }
         }
         
         setGameState(prev => ({ ...prev, currentEvent: null, activeEnemy: null }));
@@ -197,17 +280,34 @@ function App() {
 
         // Turno do Inimigo (Contra-ataque)
         setTimeout(() => {
-          const enemyD20 = rollDice(20);
-          const enemyToHit = enemyD20 + 2;
-          
-          if (enemyToHit >= armorClass) {
-            const enemyDmg = rollDamage(gameState.activeEnemy.damage);
-            addLog(`O ${enemy.name} atacou! Sofreu ${enemyDmg} de dano.`);
-            setPlayer(prev => ({ ...prev, currentHp: prev.currentHp - enemyDmg }));
-          } else {
-            addLog(`Esquivou-se do ataque do ${enemy.name}!`);
-          }
-        }, 500);
+      // --- MECÂNICA DO CHEFE: REGENERAÇÃO ---
+      if (enemy.id === 'vigilante_lodo' && enemy.currentHp > 0) {
+        const healAmount = 5;
+        setGameState(prev => {
+          if (!prev.activeEnemy) return prev;
+          return {
+            ...prev,
+            activeEnemy: { 
+              ...prev.activeEnemy, 
+              currentHp: Math.min(prev.activeEnemy.maxHp, prev.activeEnemy.currentHp + healAmount) 
+            }
+          };
+        });
+        addLog(`O lodo junta-se novamente... O Vigilante recuperou ${healAmount} HP!`);
+      }
+
+      // O Inimigo ataca
+      const enemyD20 = rollDice(20);
+      const enemyToHit = enemyD20 + 2; 
+      
+      if (enemyToHit >= armorClass) {
+        const enemyDmg = rollDamage(enemy.damage);
+        addLog(`O ${enemy.name} atacou! Sofreu ${enemyDmg} de dano.`);
+        setPlayer(prev => ({ ...prev, currentHp: prev.currentHp - enemyDmg }));
+      } else {
+        addLog(`Esquivou-se do ataque do ${enemy.name}!`);
+      }
+    }, 300);
       }
       setIsMagicOpen(false); // Fecha o modal
     }
@@ -289,14 +389,27 @@ function App() {
                       {quests[gameState.activeNpc.id] === 'active' && (
                         <button 
                           onClick={() => {
-                            // Verifica se tem o item no inventário
                             const itemIndex = inventory.findIndex(i => i.id === gameState.activeNpc.questItem);
                             if (itemIndex !== -1) {
-                              // Tem o item! Remove do inventário e completa a quest
                               addToInventory(prev => prev.filter((_, idx) => idx !== itemIndex));
                               setQuests(prev => ({ ...prev, [gameState.activeNpc.id]: 'completed' }));
                               addLog(`✅ Missão Concluída! Entregou o item a ${gameState.activeNpc.name}.`);
                               addLog(`🎁 Recompensa: ${gameState.activeNpc.rewardText}`);
+                              
+                              // --- NOVO: RECOMPENSAS ESPECÍFICAS DOS NPCS ---
+                              if (gameState.activeNpc.id === 'kaelen') {
+                                // Aumenta a INT e a PRE em +2 permanentemente!
+                                setPlayer(prev => ({
+                                  ...prev,
+                                  attributes: {
+                                    ...prev.attributes,
+                                    inteligencia: prev.attributes.inteligencia + 2,
+                                    presenca: prev.attributes.presenca + 2
+                                  }
+                                }));
+                              }
+                              // ----------------------------------------------
+
                             } else {
                               addLog("❌ Você ainda não tem o item necessário no inventário!");
                             }
@@ -380,16 +493,17 @@ function App() {
                   {inventory.length === 0 && <p className="text-zinc-600 italic text-center mt-10">A mochila está vazia...</p>}
                   
                   {inventory.map((item, index) => {
-                    // Verifica se o jogador pode equipar este item específico
+                    if (!item) return null;
+
                     const canEquip = checkRequirements(item);
 
                     return (
                       <div key={index} className="bg-zinc-900 border border-zinc-800 p-3 rounded flex justify-between items-center group">
                         <div>
                           <p className="font-bold text-zinc-200">{item.name}</p>
-                          <p className="text-[10px] text-zinc-500 uppercase">{item.type.replace('_', ' ')}</p>
+                          {/* Note os pontos de interrogação no type */}
+                          <p className="text-[10px] text-zinc-500 uppercase">{item?.type?.replace('_', ' ')}</p>
                           
-                          {/* MOSTRA OS REQUISITOS EM VERMELHO SE NÃO PUDER EQUIPAR */}
                           {!canEquip && item.requirements && (
                             <p className="text-[9px] text-red-400 mt-1 font-bold">
                               REQ: {Object.entries(item.requirements).map(([attr, val]) => `${attr.toUpperCase()} ${val}`).join(' | ')}
@@ -397,7 +511,8 @@ function App() {
                           )}
                         </div>
                         <div className="flex gap-2">
-                          {(item.type.startsWith('arma') || item.type.startsWith('armadura')) && (
+                          {/* Note os pontos de interrogação aqui também */}
+                          {(item?.type?.startsWith('arma') || item?.type?.startsWith('armadura')) && (
                             <button 
                               onClick={() => equipItem(item)}
                               disabled={!canEquip}
@@ -410,6 +525,19 @@ function App() {
                               {canEquip ? 'EQUIPAR' : 'BLOQUEADO'}
                             </button>
                           )}
+
+                          {item?.type?.includes('consumivel') && (
+                            <button 
+                              onClick={() => {
+                                consumeItem(item, index);
+                                // Fecha a mochila automaticamente se quiser, ou deixa aberta
+                              }}
+                              className="text-[10px] bg-green-900/30 hover:bg-green-600 border border-green-800 px-2 py-1 rounded text-green-200 transition-colors"
+                            >
+                              USAR
+                            </button>
+                          )}
+
                           <button 
                             onClick={() => removeFromInventory(index)}
                             className="text-[10px] bg-zinc-800 hover:bg-red-900 border border-zinc-700 px-2 py-1 rounded text-zinc-400 hover:text-white transition-colors"
@@ -523,6 +651,23 @@ function App() {
               >
                 <Backpack size={18} /> Bolsa
               </button>
+
+              {gameState.currentArea === 'esgotos' && player.level >= 4 && gameState.currentEvent !== 'combat' && (
+                <button 
+                  onClick={() => {
+                    const boss = enemies.vigilante_lodo;
+                    setGameState(prev => ({
+                      ...prev,
+                      currentEvent: 'combat',
+                      activeEnemy: { ...boss, currentHp: boss.maxHp }
+                    }));
+                    addLog(`ATENÇÃO! A água escura treme. O ${boss.name} ergue-se bloqueando a saída!`);
+                  }}
+                  className="flex flex-col items-center justify-center p-2 bg-purple-900/50 hover:bg-purple-800 border border-purple-600 rounded transition-colors text-xs font-bold uppercase gap-1 text-purple-200 col-span-4"
+                >
+                  <Skull size={18} /> Desafiar Guardião da Saída
+                </button>
+              )}
             </div>
           </div>
 

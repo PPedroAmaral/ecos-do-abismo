@@ -33,9 +33,12 @@
 
     const playSFX = (type) => {
         let src = '';
-        if (type === 'attack') src = '/audio/sword.mp3';
-        if (type === 'magic') src = '/audio/magic.mp3';
 
+        if (type === 'attack') src = '/audio/sword.mp3';
+    
+        if (type === 'fogo_fatuo') src = '/audio/fogo_fatuo.mp3';
+        if (type === 'cura_menor') src = '/audio/cura_menor.mp3';
+        
         if (!src) return;
 
         const sfx = new Howl({

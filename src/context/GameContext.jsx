@@ -37,7 +37,8 @@ export const GameProvider = ({ children }) => {
 
     const [quests, setQuests] = useState({
         vane: 'not_started',    // Pode ser: 'not_started', 'active', 'completed'
-        valerius: 'not_started' // Para quando criarmos o Ferreiro
+        valerius: 'not_started', // Para quando criarmos o Ferreiro
+        kaelen: 'not_started'
     });
 
     const maxHp = (player.attributes.vigor * 10) + (player.level * 2)
@@ -61,7 +62,7 @@ export const GameProvider = ({ children }) => {
     }
 
     const checkRequirements = (item) => {
-        if (!item.requirements) return true;
+        if (!item || !item.requirements) return true;
         
         for (const [attr, value] of Object.entries(item.requirements)) {
         const attrKey = attr.toLowerCase(); 
@@ -183,6 +184,29 @@ export const GameProvider = ({ children }) => {
         addLog(`Equipou: ${item.name}.`);
     };
 
+    const consumeItem = (item, index) => {
+        if (!item?.type?.includes('consumivel')) {
+        addLog(`❌ Você não pode usar ${item?.name} assim.`);
+        return;
+        }
+
+        // Se o item tiver um efeito de cura de HP
+        if (item.effect && item.effect.healHp) {
+        setPlayer(prev => ({
+            ...prev,
+            // Garante que a cura não ultrapasse a Vida Máxima
+            currentHp: Math.min(maxHp, prev.currentHp + item.effect.healHp)
+        }));
+        addLog(`🧪 Você bebeu ${item.name} e recuperou ${item.effect.healHp} HP!`);
+        } else if (item.id === 'sal_refinado') {
+        // Efeito narrativo do sal (depois podemos fazer dar dano no chefe de lodo)
+        addLog(`🧂 Você espalha o ${item.name}. O ar fica mais seco ao seu redor.`);
+        }
+
+        // Após usar, o item some da mochila
+        removeFromInventory(index);
+    };
+
     const removeFromInventory = (index) => {
         setInventory(prev => prev.filter((_, i) => i !== index));
     };
@@ -196,7 +220,8 @@ export const GameProvider = ({ children }) => {
             gameState, setGameState, addLog,
             checkRequirements,
             xpToNextLevel, gainXp, increaseAttribute,
-            addToInventory, equipItem, removeFromInventory
+            addToInventory, equipItem, removeFromInventory,
+            consumeItem
         }}>
             {children}
         </GameContext.Provider>
