@@ -6,11 +6,18 @@ import { rollDice, rollDamage } from './utils/dice'
 import { items } from './data/items';
 import { spells } from './data/spells';
 import { npcs } from './data/npcs';
+import { useAudio } from './hooks/useAudio';
 
 
 
 function App() {
   const { player, setPlayer, maxHp, maxMp, armorClass, gameState, setGameState, addLog, gainXp, xpToNextLevel, increaseAttribute, addToInventory, equipItem, removeFromInventory, MAX_INVENTORY_SLOTS, inventory, checkRequirements, quests, setQuests } = useGame();
+
+  const { playBGM, playSFX } = useAudio();
+  useEffect(() => {
+    playBGM(gameState.currentArea);
+  }, [gameState.currentArea]);
+
   const logEndRef = useRef(null);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isMagicOpen, setIsMagicOpen] = useState(false)
@@ -83,6 +90,7 @@ function App() {
     addLog(`Total: ${toHit}`)
 
     if (toHit >= enemy.ac) {
+      playSFX('attack');
       const baseDmg = weapon ? rollDamage(weapon.damage) : 1;
       const totalDamage = baseDmg + attrBonus + Math.floor(player.level / 2)
 
@@ -135,6 +143,7 @@ function App() {
     }
 
     setPlayer(prev => ({ ...prev, currentMp: prev.currentMp - spell.mpCost }));
+    playSFX('magic');
 
     const intBonus = Math.floor((player.attributes.inteligencia - 10) / 2)
 
